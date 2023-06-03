@@ -74,6 +74,8 @@ if util.is_video(opt.media):
     else:
         opt.fps = np.clip(opt.fps,1,opt.ori_fps)
     if system_type == 'Linux':
+        if os.path.isfile('./tmp/tmp.wav'):
+            os.remove('./tmp/tmp.wav')
         ffmpeg.video2voice(opt.media,'-ar 16000 ./tmp/tmp.wav')
 
 #-------------------------------main-------------------------------
