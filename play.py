@@ -2,12 +2,13 @@ import os
 import sys
 import time
 import multiprocessing
-from multiprocessing import Process, Queue
-import threading
+from queue import Queue
+from threading import Thread
 import subprocess
 import numpy as np
 import cv2
 import platform
+from console.screen import sc
 
 from util import util,ffmpeg
 from img2shell import Transformer
@@ -30,6 +31,12 @@ def timer(opt,timerQueueime):
         t = 1.0/opt.fps
         time.sleep(t)
         timerQueueime.put(True)
+
+def cvtframe(opt, imgQueue, cvtQueue):
+    while True:
+        img = imgQueue.get()
+        frame = transformer.convert(img, opt.gray)
+        cvtQueue.put(frame)
 
 opt = Options().getparse()
 system_type = 'Linux'
@@ -87,22 +94,25 @@ if __name__ == '__main__':
     elif util.is_video(opt.media):
         imgQueue = Queue(1)
         timerQueue = Queue()
+        cvtQueue = Queue()
 
-        imgload_p = Process(target=readvideo,args=(opt,imgQueue))
+        imgload_p = Thread(target=readvideo,args=(opt,imgQueue))
         imgload_p.daemon = True
         imgload_p.start()
 
-        timer_p = Process(target=timer,args=(opt,timerQueue))
+        timer_p = Thread(target=timer,args=(opt,timerQueue))
         timer_p.daemon = True
         timer_p.start()
+
+        converted_p = Thread(target=cvtframe, args=(opt,imgQueue,cvtQueue))
+        converted_p.daemon = True
+        converted_p.start()
 
         time.sleep(0.5)
         if system_type == 'Linux':
             subprocess.Popen('paplay ./tmp/tmp.wav', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
         for i in range(int(opt.frame_num*opt.fps/opt.ori_fps)-1):
             timerQueue.get()
-            img = imgQueue.get()
-            string = transformer.convert(img,opt.gray)
-            t=threading.Thread(target=print,args=(string,))
-            t.start()
+            frame = cvtQueue.get()
+            with sc.location(0, 0):
+                print(frame)
