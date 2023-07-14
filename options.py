@@ -1,4 +1,5 @@
 import argparse
+import os
 
 class Options():
     def __init__(self):
@@ -23,5 +24,7 @@ class Options():
         if not self.initialized:
             self.initialize()
         self.opt = self.parser.parse_args()
+        if not os.path.isfile(self.opt.media):
+            raise OSError("not found file "+ self.opt.media)
         return self.opt
 

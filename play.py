@@ -8,11 +8,14 @@ import subprocess
 import numpy as np
 import cv2
 import platform
-from console.screen import sc
+from util.util import AverageValueCalc
 
 from util import util,ffmpeg
-from img2shell import Transformer
+# from img2shell import Transformer
+from image2console import Transformer
 from options import Options
+
+debug = True
 
 def readvideo(opt,imgQueue):
     cap = cv2.VideoCapture(opt.media)
@@ -27,10 +30,16 @@ def readvideo(opt,imgQueue):
         frame_cnt += 1
 
 def timer(opt,timerQueueime):
+    last = time.time()
     while True:
         t = 1.0/opt.fps
-        time.sleep(t)
-        timerQueueime.put(True)
+        now = time.time()
+        delta = now - last
+        if delta >= t:
+            timerQueueime.put(True)
+            last = now
+            continue
+        time.sleep((t - delta) / 2)
 
 def cvtframe(opt, imgQueue, cvtQueue):
     while True:
@@ -111,8 +120,19 @@ if __name__ == '__main__':
         time.sleep(0.5)
         if system_type == 'Linux':
             subprocess.Popen('paplay ./tmp/tmp.wav', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        for i in range(int(opt.frame_num*opt.fps/opt.ori_fps)-1):
+        playstart = time.time()
+        smoother = AverageValueCalc(window_len=60)
+        frame_cnt = int(opt.frame_num*opt.fps/opt.ori_fps)-1
+        for i in range(frame_cnt):
+            framstart = time.time()
             timerQueue.get()
             frame = cvtQueue.get()
-            with sc.location(0, 0):
-                print(frame)
+            sys.stdout.write(frame)
+            now = time.time()
+            frametimespan = now - framstart
+            smoother.add(frametimespan)
+            playtimespan = now - playstart
+            if debug:
+                print(f'playing: {opt.media}, frame: {i+1}/{frame_cnt}')
+                print(f'expected cost time: {1.0/opt.fps*i:.4f}, timespan: {1/opt.fps:.4f}, fps: {opt.fps:.2f}')
+                print(f'actual   cost time: {playtimespan:.4f}, timespan: {frametimespan:.4f}, fps: {1/frametimespan:.2f} smoothed: {1/smoother.avg():.2f}')

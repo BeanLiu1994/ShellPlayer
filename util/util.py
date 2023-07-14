@@ -106,3 +106,26 @@ def opt2str(opt):
         message += '{:>25}: {:<35}\n'.format(str(k), str(v))
     message += '----------------- End -------------------'
     return message
+
+class AverageValueCalc:
+    def __init__(self, window_len=10) -> None:
+        self.values=[]
+        for _ in range(window_len):
+            self.values.append(None)
+        self.idx=0
+        
+    def add(self, val):
+        if len(self.values) <= self.idx:
+            self.idx=0
+        self.values[self.idx]=val
+        self.idx=self.idx+1
+            
+    def avg(self):
+        total = 0
+        cnt = 0
+        for v in self.values:
+            if v is not None:
+                cnt = cnt + 1
+                total = total + v
+        return total/cnt
+    

@@ -1,6 +1,15 @@
+import io
 import numpy as np
 import cv2
 import time
+import atexit
+from concurrent.futures import ThreadPoolExecutor
+
+def reset():
+    return '\x1b[39m\x1b[49m'
+
+def clear():
+    return '\x1b[3J\x1b[1;1H'
 
 '''
 #norm
@@ -77,6 +86,7 @@ class Transformer(object):
         for i in range(self.color_length):
             self.color_contrast_matrix[i,:,:] = self.colors_hue[i]
         self.color_contrast_distance = np.zeros((self.color_length,self.strh,self.strw))
+        self.executor = ThreadPoolExecutor(max_workers=8)
     
     def blank(self,string):
         if self.sch>self.strh:
@@ -90,13 +100,13 @@ class Transformer(object):
             if img.shape[2] == 4:
                 img = img[:,:,:2]
             img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        string = ''
+        string_buffer = io.StringIO()
         for i in range(self.strh):
             for j in range(self.strw):
-                string += self.chars[img[i][j]//32]
+                string_buffer.write(self.chars[img[i][j]//32])
             if i != self.strh-1:
-                string += '\n'
-        string = self.blank(string)
+                string_buffer.write('\n')
+        string = reset()+self.blank(string_buffer.getvalue())
 
         return string
 
@@ -136,14 +146,19 @@ class Transformer(object):
 
         self.color_contrast_distance = np.linalg.norm(self.color_img_matrix-self.color_contrast_matrix,ord=self.ord,axis=3)
 
-        string = ''
-        for i in range(self.strh):
+        def calc_row(i):
+            row = ''
             for j in range(self.strw):
-                string += self.pixel_color(bright[i,j],self.color_contrast_distance[:,i,j])
-            if i != self.strh-1:
-                string += '\n'
+                row += self.pixel_color(bright[i,j],self.color_contrast_distance[:,i,j])
+            return row
 
-        string = self.blank(string)
+        string = ''
+        rows = self.executor.map(calc_row, range(self.strh))
+        for row in rows:
+            string += row
+            string += '\n'
+
+        string = reset()+self.blank(string)
 
         return string
     
@@ -167,6 +182,9 @@ class Transformer(object):
 
 def main():
     pass
+
+
+atexit.register(reset)
 
 if __name__ == '__main__':
     main()
